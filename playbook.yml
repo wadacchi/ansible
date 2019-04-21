@@ -1,0 +1,39 @@
+---
+- hosts: all
+  become: yes
+  vars:
+    username: swada
+    #  vars_prompt:
+    #    username: "Enter username"
+  tasks:
+    - name: add a new user
+      user: name={{username}}
+
+- hosts: web
+  become: yes
+  tasks:
+          - name: install apache
+            yum: name=httpd state=latest
+          - name: start apache and enable
+            systemd: name=httpd state=started enabled=yes
+          - name: change owner
+            file: dest=/var/www/html owner=ec2-user recurse=yes
+          - name: copy index.html
+            copy: src=./index.html dest=/var/www/html/index.html owner=ec2-user
+          - name: install php7
+            shell: "sudo amazon-linux-extras install php7.2 -y"
+          - name: install php lib
+            yum: name={{item}} state=latest
+            with_items:
+                    - php-devel
+                    - php-mbstring
+                    - php-mysql
+            notify:
+                    - restart apache
+  handlers:
+          - name: restart apache
+            systemd:
+              name: httpd 
+              state: restarted
+
+- hosts: web
