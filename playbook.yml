@@ -11,10 +11,10 @@
         name: "{{item.name}}"
         state: present
       with_items:
-                - { name: web }
+                - {name: web }
                 - {name: labo }
                 - {name: creative }
-    - name: add a new user
+    - name: Add the user 'swada' with a specific uid and a primary group of 'web'
       user:
         name: swada
         #group: web
@@ -46,6 +46,10 @@
   tasks:
           - group:
               name: web
+          - name: install extras epel
+            shell: "sudo amazon-linux-extras install epel -y"
+          - name: install Remi
+            yum: name=http://rpms.famillecollet.com/enterprise/remi-release-7.rpm state=present
           # apche install
           - name: install apache
             yum: name=httpd state=latest
@@ -55,10 +59,13 @@
           - name: change owner
             file: dest=/var/www/html owner=ec2-user recurse=yes
           - name: copy index.html
-            copy: src=./index.html dest=/var/www/html/index.html owner=ec2-user
+            copy: src=./file/index.html dest=/var/www/html/index.html owner=ec2-user
           # mkdir DocumentRoot
           - name: DocumentRoot location config file directory
             file: path=/data/www/ state=directory owner=labo group=labo mode=0755
+          # Add apche group labo
+          - name: Add apache group labo
+            user: name=labo group=apache
           # php install
           - name: install php7
             shell: "sudo amazon-linux-extras install php7.2 -y"
@@ -70,6 +77,49 @@
                     - php-mysql
             notify:
                     - restart apache
+
+          # install mysqld_5.6
+          - name: add MySQL Yum Repository
+            yum:
+              name: http://dev.mysql.com/get/mysql57-community-release-el6-7.noarch.rpm
+              state: present
+
+          - name: disable mysql57-community
+            command: yum-config-manager --disable mysql57-community
+
+          - name: enable mysql56-community
+            command: yum-config-manager --enable mysql56-community
+
+          - name: mysqld started enable satting
+            systemd:
+                   name=mysqld
+                   state=started
+                   enabled=yes
+
+          - name: Ansible mysql module
+            yum:
+              name: MySQL-python
+              state: present
+
+          # MariaDB install
+          #- name: install mariadb
+          #  yum: name=mariadb-server state=installed
+
+          #- name: start MariaDB
+          #  systemd: name=mariadb state=started enabled=yes
+
+          #- name: MariaDB required tool install
+          #  yum: name=MySQL-python state=installed
+
+          #- name: run mysql-server
+          #  systemd: name=mysql state=started enabled=yes
+
+          #- name: DB Wordpress create
+          #  mysql_db:
+          #          name: name
+          #          state: present
+
+
   # install 終了後 apache 再起動
   handlers:
           - name: restart apache
