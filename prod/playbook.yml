@@ -1,0 +1,162 @@
+- hosts: prod
+  vars:
+    username: swada
+  become: yes
+  tasks:
+          - name: set timezone to Asia/Tokyo
+            timezone:
+              name: Asia/Tokyo
+
+          - name: more complex items to add several users
+            user:
+              name: "{{item.name}}"
+              state: present
+            with_items:
+                - {name: web }
+                - {name: labo }
+                - {name: creative }
+
+          - name: Add the user 'swada' with a specific uid and a primary group of 'web'
+            user:
+              name: swada
+              #group: web
+              #
+          - lineinfile:
+              path: /etc/sudoers
+              state: present
+              regexp: '^%wheel\s'
+              line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+
+          - user: name=swada group=wheel
+
+          - name: install git
+            yum: name=git state=latest
+
+          - name: install tmux
+            yum: name=tmux state=latest
+
+          - name: SSM Agent install
+            yum: name=https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm state=present
+
+          - name: SSM Agent started enable
+            systemd: name=amazon-ssm-agent state=started enabled=yes
+
+          - name: mkdir DocumentRoot
+            file: path=/data/www/
+               state=directory
+               owner=swada
+               group=web
+               mode=0755
+            state: present
+
+          - group:
+              name: web
+
+          - name: install extras epel
+            become: yes
+            shell: "amazon-linux-extras install epel -y"
+
+          - name: install Remi
+            yum: name=http://rpms.famillecollet.com/enterprise/remi-release-7.rpm state=present
+
+          # apche install
+          - name: install apache
+            yum: name=httpd state=latest
+          - name: start apache and enable
+            systemd: name=httpd state=started enabled=yes
+
+          # index.html copy
+          - name: change owner
+            file: dest=/var/www/html owner=ec2-user recurse=yes
+          - name: copy index.html
+            copy: src=/home/ec2-user/prod/file/index.html dest=/var/www/html/index.html owner=ec2-user
+
+          # mkdir DocumentRoot
+          - name: DocumentRoot location config file directory
+            file: path=/data/www/ state=directory owner=labo group=labo mode=0755
+
+          # Add apche group labo
+          - name: Add apache group labo
+            user: name=labo group=apache
+
+          # php install
+          - name: install php7
+            become: yes
+            shell: "amazon-linux-extras install php7.2 -y"
+            #- name: install php lib
+            #yum: name={{item}} state=latest
+            #with_items:
+                      #- php-devel
+                      #- php-mbstring
+                      #- php-mysql
+            notify:
+                    - restart apache
+
+          # logrotate setting
+          - name: logrotate file copy
+            copy: src=/home/ec2-user/stg/file/httpd dest=/etc/logrotate.d/httpd owner=root group=root mode=0644            
+          - command: /usr/sbin/logrotate /etc/logrotate.d/httpd
+
+          # install mysqld_5.6
+          - name: remove mariadb
+            yum:
+              name: mariadb-libs
+              state: absent
+
+          - name: delete mysql file
+            file:
+               path: /var/lib/mysql/
+               state: absent
+
+          - name: add MySQL Yum Repository
+            yum:
+              name: http://dev.mysql.com/get/mysql57-community-release-el6-7.noarch.rpm
+              state: present
+
+          - name: disable mysql57
+            become: yes
+            shell: "yum-config-manager --disable mysql57-community"
+
+          - name: enable mysql56
+            become: yes
+            shell: "yum-config-manager --enable mysql56-community"
+
+          - name: install mysql server
+            yum: name=mysql-community-server
+
+          - name: mysqld started enable satting
+            systemd:
+                   name=mysqld
+                   state=started
+                   enabled=yes
+
+          - name: Ansible mysql module
+            yum:
+              name: MySQL-python
+              state: present
+
+          # MariaDB install
+          #- name: install mariadb
+          #  yum: name=mariadb-server state=installed
+
+          #- name: start MariaDB
+          #  systemd: name=mariadb state=started enabled=yes
+
+          #- name: MariaDB required tool install
+          #  yum: name=MySQL-python state=installed
+
+          #- name: run mysql-server
+          #  systemd: name=mysql state=started enabled=yes
+
+          #- name: DB Wordpress create
+          #  mysql_db:
+          #          name: name
+          #          state: present
+
+
+  # install 終了後 apache 再起動
+  handlers:
+          - name: restart apache
+            systemd:
+              name: httpd 
+              state: restarted
