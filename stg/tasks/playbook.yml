@@ -1,6 +1,6 @@
 - hosts: stg
-  vars:
-    username: swada
+  vars_files:
+   - /home/ec2-user/stg/vars/vars.yml
   become: yes
   tasks:
           - name: set timezone to Asia/Tokyo
@@ -11,21 +11,41 @@
             user:
               name: "{{item.name}}"
               state: present
+              groups: apache
             with_items:
                 - {name: web }
                 - {name: labo }
                 - {name: creative }
 
+          - name: Add the user 'labo' with a specific uid and a primary group of 'wheel'
+            user:
+              name: labo
+              groups: wheel
+
           - name: Add the user 'swada' with a specific uid and a primary group of 'web'
             user:
-              name: swada
-              #group: web
-              #
+              name: "{{ username }}"
+              groups: web
+
+          - name: Add the user 'labo' with a specific uid and a primary group of 'apache'
+            user:
+              name: labo
+              groups: apache
+
           - lineinfile:
               path: /etc/sudoers
               state: present
               regexp: '^%wheel\s'
               line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+
+          - name: Ensure group "somegroup" exists
+            group:
+              name: somegroup
+              state: absent
+
+          # Add labo group wheel
+          - name: Add labo group wheel
+            user: name=labo group=wheel
 
           - user: name=swada group=wheel
 
@@ -44,8 +64,8 @@
           - name: mkdir DocumentRoot
             file: path=/data/www/
                state=directory
-               owner=swada
-               group=web
+               owner=labo
+               group=labo
                mode=0755
             state: present
 
@@ -65,11 +85,37 @@
           - name: start apache and enable
             systemd: name=httpd state=started enabled=yes
 
+          # copy httpd file
+          - name: copy httpd file
+            copy: src=/home/ec2-user/stg/file/httpd.conf dest=/etc/httpd/conf owner=root group=root mode=0644
+
+          - name: copy httpd file
+            copy: src=/home/ec2-user/stg/file/virtualhost.conf dest=/etc/httpd/conf.d owner=root group=root mode=0644
+
           # index.html copy
           - name: change owner
-            file: dest=/var/www/html owner=ec2-user recurse=yes
-          - name: copy index.html
-            copy: src=/home/ec2-user/prod/file/index.html dest=/var/www/html/index.html owner=ec2-user
+            file: 
+               dest=/var/www/html
+               owner=labo
+               group=labo
+               recurse=yes
+               mode=774
+
+          - name: copy index.html (Default DocumentRoot)
+            copy: 
+               src=/home/ec2-user/prod/file/index.html 
+               dest=/var/www/html/index.html
+               owner=labo
+               group=labo
+               mode=664
+
+          - name: copy index.html (VirtualHost DocumentRoot)
+            copy: 
+               src=/home/ec2-user/prod/file/index.html
+               dest=/data/www/index.html
+               owner=labo
+               group=labo
+               mode=664
 
           # mkdir DocumentRoot
           - name: DocumentRoot location config file directory
@@ -91,6 +137,10 @@
                       #- php-mysql
             notify:
                     - restart apache
+
+          # copy php.ini
+          - name: copy php.ini
+            copy: src=/home/ec2-user/stg/file/php.ini dest=/etc/ owner=root group=root mode=0664
 
           # logrotate setting
           - name: logrotate file copy
