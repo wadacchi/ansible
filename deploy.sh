@@ -20,6 +20,19 @@
 #   --deploy     : 本番デプロイ
 #
 
+set -ue
+
+function usage()
+{
+    sed -rn '/^# Usage/,${/^#/!q;s/^# ?//;p}' "$0"
+    exit 1
+}
+
+# Usage Da Yo!
+
+if [ $1 = --help ]; then
+    usage
+fi
 
 echo "\$0（スクリプト名）: $0"
 echo "\$1（1番目の引数）: $1"
@@ -34,7 +47,7 @@ if [ $2 = --deploy ]; then
 	fi
 fi
 
-if [ $2 = --check ]; then
+if [ $2 = --dry ]; then
         if [ $1 = prod ]; then
            ansible-playbook -i prod prod/tasks/playbook.yml --check
 	fi
