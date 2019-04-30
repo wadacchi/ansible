@@ -20,6 +20,29 @@
 #   --deploy     : 本番デプロイ
 #
 
+
+echo "\$0（スクリプト名）: $0"
+echo "\$1（1番目の引数）: $1"
+echo "\$2（番目の引数）: $2"
+
+if [ $2 = --deploy ]; then
+	if [ $1 = prod ]; then
+           ansible-playbook -i prod prod/tasks/playbook.yml
+	fi
+        else if [ $1 = stg ]; then
+          ansible-playbook -i stg stg/tasks/playbook.yml
+	fi
+fi
+
+if [ $2 = --check ]; then
+        if [ $1 = prod ]; then
+           ansible-playbook -i prod prod/tasks/playbook.yml --check
+	fi
+        else if [ $1 = stg ]; then
+          ansible-playbook -i stg stg/tasks/playbook.yml --check
+	fi
+fi
+
 set -ue
 
 function usage()
@@ -29,34 +52,8 @@ function usage()
 }
 
 # Usage Da Yo!
-usage
 
-echo "\$0（スクリプト名）: $0"
-echo "\$1（1番目の引数）: $1"
-echo "\$2（番目の引数）: $2"
-
-if [ $1 = prod ]; then
-    ansible-playbook -i prod prod/tasks/playbook.yml --check
-  else
-    echo "引数が間違っています"
-  fi
-    if [ $2 = --deploy ]; then
-      ansible-playbook -i prod prod/tasks/playbook.yml
-    else
-      echo "prodにdeployできません"
-    fi
-
-
-
-if [ $1 = stg ]; then
-  if [ $2 = --dry ]; then
-    ansible-playbook -i stg stg/tasks/playbook.yml --check
-  else
-    echo "引数が間違っています"
-  fi
-    if [ $2 = --deploy ]; then
-      ansible-playbook -i stg stg/tasks/playbook.yml
-    else
-      echo "stgにdeployできません"
-    fi
+if [ $1 = --help ]; then
+    usage
 fi
+
